@@ -11,10 +11,23 @@ import UIKit
 import CoreBluetooth
 
 private enum Constants {
-    static let deviceName = "MLT-BT05"
-    static let serviceId = "FFE0"
-    static let serviceUUID = CBUUID(string: "FFE0")
-    static let propertyUUID = CBUUID(string: "FFE1")
+    
+    struct Connection {
+        static let deviceName = "MLT-BT05"
+        static let serviceId = "FFE0"
+        static let serviceUUID = CBUUID(string: "FFE0")
+        static let propertyUUID = CBUUID(string: "FFE1")
+    }
+    
+    struct Temperature {
+        static let minTemperature = 30
+        static let maxTemperature = 230
+        static let yellowZone = 195
+        static let redZone = 215
+        static let temperatureRange = maxTemperature - minTemperature
+        static let degreePerPercent = temperatureRange / 100
+    }
+    
 }
 
 final class MainViewController: UIViewController {
@@ -31,13 +44,23 @@ final class MainViewController: UIViewController {
     @IBOutlet weak var head6Label: UILabel!
     @IBOutlet weak var timestampLabel: UILabel!
     
+    @IBOutlet weak var head1Bar: UIProgressView!
+    @IBOutlet weak var head2Bar: UIProgressView!
+    @IBOutlet weak var head3Bar: UIProgressView!
+    @IBOutlet weak var head4Bar: UIProgressView!
+    @IBOutlet weak var head5Bar: UIProgressView!
+    @IBOutlet weak var head6Bar: UIProgressView!
+    
     var scanningInProgress: Bool = false
     
     override func viewDidLoad() {
         super.viewDidLoad()
         
+        setupViews()
+        
         manager = CBCentralManager(delegate: self, queue: nil)
     }
+    
     @IBAction func scanTapped(_ sender: Any) {
         if scanningInProgress {
             manager?.stopScan()
@@ -65,7 +88,7 @@ extension MainViewController: CBCentralManagerDelegate {
 
         let device = (advertisementData as NSDictionary).object(forKey: CBAdvertisementDataLocalNameKey) as? NSString
 
-        if device?.contains(Constants.deviceName) ?? false {
+        if device?.contains(Constants.Connection.deviceName) ?? false {
             central.stopScan()
             self.peripheral = peripheral
             self.peripheral?.delegate = self
@@ -86,7 +109,7 @@ extension MainViewController: CBPeripheralDelegate {
     func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
         guard let services = peripheral.services else { return }
         for service in services {
-            if service.uuid == Constants.serviceUUID {
+            if service.uuid == Constants.Connection.serviceUUID {
                 peripheral.discoverCharacteristics(nil, for: service)
             }
         }
@@ -97,7 +120,7 @@ extension MainViewController: CBPeripheralDelegate {
         guard let characteristics = service.characteristics else { return }
         
         for characteristic in characteristics {
-            if characteristic.uuid == Constants.propertyUUID {
+            if characteristic.uuid == Constants.Connection.propertyUUID {
                 self.peripheral.setNotifyValue(true, for: characteristic)
             }
         }
@@ -108,7 +131,7 @@ extension MainViewController: CBPeripheralDelegate {
             static var responseString: String = ""
         }
 //        characteristic.properties
-        if characteristic.uuid == Constants.propertyUUID {
+        if characteristic.uuid == Constants.Connection.propertyUUID {
             if let bytes = characteristic.value, let stringData = String(bytes: bytes, encoding: .utf8) {
                 
                 if stringData.contains("Time:") {
@@ -126,6 +149,28 @@ extension MainViewController: CBPeripheralDelegate {
 }
 
 private extension MainViewController {
+    func setupViews() {
+        head1Bar.progress = 0.0
+        head1Bar.transform = head1Bar.transform.scaledBy(x: 1, y: 5)
+        
+        head2Bar.progress = 0.0
+        head2Bar.transform = head2Bar.transform.scaledBy(x: 1, y: 5)
+        
+        head3Bar.progress = 0.0
+        head3Bar.transform = head3Bar.transform.scaledBy(x: 1, y: 5)
+        
+        head4Bar.progress = 0.0
+        head4Bar.transform = head4Bar.transform.scaledBy(x: 1, y: 5)
+        
+        head5Bar.progress = 0.0
+        head5Bar.transform = head5Bar.transform.scaledBy(x: 1, y: 5)
+        
+        head6Bar.progress = 0.0
+        head6Bar.transform = head6Bar.transform.scaledBy(x: 1, y: 5)
+    }
+}
+
+private extension MainViewController {
     func handleResponse(response: String) {
         let elements = response.components(separatedBy: ",")
         print(elements)
@@ -136,6 +181,19 @@ private extension MainViewController {
             return dict
         }
         updateUI(viewModel: elementsDictionary)
+    }
+    
+    func temperatureToPercent(temperature: Int) -> Float {
+        let percents = (temperature - Constants.Temperature.minTemperature) / Constants.Temperature.degreePerPercent
+        return Float(percents) / 100
+    }
+    
+    func temperatureInYellowRange(temperature: Int) -> Bool {
+        return (temperature >= Constants.Temperature.yellowZone) && (temperature < Constants.Temperature.redZone) ? true : false
+    }
+    
+    func temperatureInRedRange(temperature: Int) -> Bool {
+        return temperature >= Constants.Temperature.redZone ? true : false
     }
     
     func updateUI(viewModel: Dictionary<String, String>) {
@@ -149,47 +207,80 @@ private extension MainViewController {
             static let head5Key = "T5"
             static let head6Key = "T6"
         }
-        if let head1TemperatureValue = viewModel[EngineMonitorParameterKeys.head1Key] {
-            head1Label.text = "Head #1: \(head1TemperatureValue) °C"
+        if let head1TemperatureValue = viewModel[EngineMonitorParameterKeys.head1Key],
+            let temperature = Int(head1TemperatureValue) {
+            let modifiedTemp = temperature + 190
+            
+            updateUIElements(temperatureLabel: head1Label, with: modifiedTemp, bar: head1Bar, with: temperatureToPercent(temperature: modifiedTemp))
         } else {
-            head1Label.text = "Head #1 NOT AVAILABLE"
+            head1Label.text = "#1 NA"
         }
         
-        if let head2TemperatureValue = viewModel[EngineMonitorParameterKeys.head2Key] {
-            head2Label.text = "Head #2: \(head2TemperatureValue) °C"
+        if let head2TemperatureValue = viewModel[EngineMonitorParameterKeys.head2Key],
+            let temperature = Int(head2TemperatureValue) {
+            let modifiedTemp = temperature + 190
+            
+            updateUIElements(temperatureLabel: head2Label, with: modifiedTemp, bar: head2Bar, with: temperatureToPercent(temperature: modifiedTemp))
         } else {
-            head2Label.text = "Head #2 NOT AVAILABLE"
+            head2Label.text = "#2 NA"
         }
         
-        if let head3TemperatureValue = viewModel[EngineMonitorParameterKeys.head3Key] {
-            head3Label.text = "Head #3: \(head3TemperatureValue) °C"
+        if let head3TemperatureValue = viewModel[EngineMonitorParameterKeys.head3Key],
+            let temperature = Int(head3TemperatureValue) {
+            let modifiedTemp = temperature + 190
+            
+            updateUIElements(temperatureLabel: head3Label, with: modifiedTemp, bar: head3Bar, with: temperatureToPercent(temperature: modifiedTemp))
         } else {
-            head3Label.text = "Head #3 NOT AVAILABLE"
+            head3Label.text = "#3 NA"
         }
         
-        if let head4TemperatureValue = viewModel[EngineMonitorParameterKeys.head4Key] {
-            head4Label.text = "Head #4: \(head4TemperatureValue) °C"
+        if let head4TemperatureValue = viewModel[EngineMonitorParameterKeys.head4Key],
+            let temperature = Int(head4TemperatureValue) {
+            let modifiedTemp = temperature + 190
+            
+            updateUIElements(temperatureLabel: head4Label, with: modifiedTemp, bar: head4Bar, with: temperatureToPercent(temperature: modifiedTemp))
         } else {
-            head4Label.text = "Head #4 NOT AVAILABLE"
+            head4Label.text = "#4 NA"
         }
         
         
-        if let head5TemperatureValue = viewModel[EngineMonitorParameterKeys.head5Key] {
-            head5Label.text = "Head #5: \(head5TemperatureValue) °C"
+        if let head5TemperatureValue = viewModel[EngineMonitorParameterKeys.head5Key],
+            let temperature = Int(head5TemperatureValue) {
+            let modifiedTemp = temperature + 190
+            
+            updateUIElements(temperatureLabel: head5Label, with: modifiedTemp, bar: head5Bar, with: temperatureToPercent(temperature: modifiedTemp))
         } else {
-            head5Label.text = "Head #5 NOT AVAILABLE"
+            head5Label.text = "#5 NA"
         }
         
-        if let head6TemperatureValue = viewModel[EngineMonitorParameterKeys.head6Key] {
-            head6Label.text = "Head #6: \(head6TemperatureValue) °C"
+        if let head6TemperatureValue = viewModel[EngineMonitorParameterKeys.head6Key],
+            let temperature = Int(head6TemperatureValue) {
+            let modifiedTemp = temperature + 217
+            
+            updateUIElements(temperatureLabel: head6Label, with: modifiedTemp, bar: head6Bar, with: temperatureToPercent(temperature: modifiedTemp))
         } else {
-            head6Label.text = "Head #6 NOT AVAILABLE"
+            head6Label.text = "#6 NA"
         }
         
         if let timeStamp = viewModel[EngineMonitorParameterKeys.timestampKey] {
             timestampLabel.text = "Timestamp: \(timeStamp)"
         } else {
             timestampLabel.text = ""
+        }
+    }
+    
+    func updateUIElements(temperatureLabel: UILabel, with temperature: Int,
+                          bar: UIProgressView, with percents: Float) {
+        
+        temperatureLabel.text = "\(temperature) °C"
+        
+        bar.progress = temperatureToPercent(temperature: temperature)
+        if temperatureInRedRange(temperature: temperature) {
+            bar.progressTintColor = UIColor.red
+        } else if temperatureInYellowRange(temperature: temperature) {
+            bar.progressTintColor = UIColor.yellow
+        } else {
+            bar.progressTintColor = UIColor.green
         }
     }
 }
