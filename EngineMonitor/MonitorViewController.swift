@@ -57,6 +57,7 @@ final class MonitorViewController: UIViewController {
         super.viewDidLoad()
         
         setupViews()
+        updateMonitorUI(viewModel: [:])
         
         manager = CBCentralManager(delegate: self, queue: nil)
     }
@@ -70,7 +71,6 @@ final class MonitorViewController: UIViewController {
             scanButton.setTitle("Disconnect", for: .normal)
         }
     }
-    
 }
 
 extension MonitorViewController: CBCentralManagerDelegate {
@@ -104,6 +104,7 @@ extension MonitorViewController: CBCentralManagerDelegate {
     
     func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
         connected = false
+        updateMonitorUI(viewModel: [:])
     }
 }
 
@@ -198,7 +199,7 @@ private extension MonitorViewController {
             dict[valueElements[0]] = valueElements[1]
             return dict
         }
-        updateUI(viewModel: elementsDictionary)
+        updateMonitorUI(viewModel: elementsDictionary)
     }
     
     func temperatureToPercent(temperature: Int) -> Float {
@@ -214,7 +215,7 @@ private extension MonitorViewController {
         return temperature >= Constants.Temperature.redZone ? true : false
     }
     
-    func updateUI(viewModel: Dictionary<String, String>) {
+    func updateMonitorUI(viewModel: Dictionary<String, String>) {
         print(viewModel)
         struct EngineMonitorParameterKeys {
             static let timestampKey = "Time"
